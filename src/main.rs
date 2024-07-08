@@ -1,12 +1,10 @@
 use itertools::Itertools;
-use lazy_static::lazy_static;
-use std::sync::RwLock;
 
 #[derive(Debug)]
 struct Shuffled {
     text: Vec<String>,
     entropy: f32,
-    child_combinations: Option<Vec<Box<Shuffled>>>,
+    child_combinations: Option<Vec<Shuffled>>,
 }
 
 fn shuffle_text(
@@ -15,14 +13,14 @@ fn shuffle_text(
     min_blocksize: usize,
     count: &mut usize,
     total: usize,
-) -> Option<Vec<Box<Shuffled>>> {
+) -> Option<Vec<Shuffled>> {
     if blocksize == 1 || blocksize < min_blocksize {
         return None;
     }
 
     blocksize = blocksize / 2;
 
-    let mut combinations: Vec<Box<Shuffled>> = Vec::new();
+    let mut combinations: Vec<Shuffled> = Vec::new();
 
     let chunks = lines.into_iter().chunks(blocksize);
     let mut string_chunks: Vec<Vec<String>> = Vec::new();
@@ -37,7 +35,7 @@ fn shuffle_text(
         *count = *count + 1;
 
         let mut text: Vec<String> = Vec::new();
-        for mut chunk in &permutation {
+        for chunk in &permutation {
             text.append(&mut chunk.clone());
         }
         eprint!(
@@ -45,11 +43,11 @@ fn shuffle_text(
             count, total
         );
 
-        combinations.push(Box::new(Shuffled {
+        combinations.push(Shuffled {
             text: text.clone(),
             entropy: 999999.999999,
             child_combinations: shuffle_text(text.clone(), blocksize, min_blocksize, count, total),
-        }));
+        });
     }
 
     Some(combinations)
@@ -72,13 +70,13 @@ fn calculate_estimated_combination_count(
     let precise_blockcount: f32 = line_count as f32 / blocksize as f32;
     let blockcount: usize = precise_blockcount.ceil() as usize;
 
-    let mut counter: usize = (1..=blockcount).product();
+    let counter: usize = (1..=blockcount).product();
     counter
         + (calculate_estimated_combination_count(line_count, blocksize, min_blocksize) * counter)
 }
 
 /// Counts the total amount of generated combination in a vector of boxed Shuffled structs.
-fn count_combinations(combinations: Vec<Box<Shuffled>>) -> usize {
+fn count_combinations(combinations: Vec<Shuffled>) -> usize {
     let mut count = combinations.len();
 
     for combination in combinations {
@@ -95,6 +93,10 @@ fn main() {
 
 
 Prost is a 4k intro framework: it uses handlebar templating and provides example democode
+Prost is a 4k intro framework: it uses handlebar templating and provides example democode
+Prost is a 4k intro framework: it uses handlebar templating and provides example democode
+Prost is a 4k intro framework: it uses handlebar templating and provides example democode
+Prost is a 4k intro framework: it uses handlebar templating and provides example democode
 
 ## Usage
 
@@ -108,7 +110,7 @@ If you clone an existing prost project, run `build_tools.sh` to clone and build 
 
     let line_count: usize = lines.clone().len();
 
-    let minbs: usize = 2;
+    let minbs: usize = 1;
 
     let estimated_combination_count: usize =
         calculate_estimated_combination_count(line_count, line_count, minbs);
