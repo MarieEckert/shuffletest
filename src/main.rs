@@ -6,10 +6,16 @@ use std::sync::RwLock;
 struct Shuffled {
     text: Vec<String>,
     entropy: f32,
-    child_combinations: Option<Vec<Box<Shuffled>>>
+    child_combinations: Option<Vec<Box<Shuffled>>>,
 }
 
-fn shuffle_text(lines: Vec<String>, mut blocksize: usize, min_blocksize: usize, count: &mut usize, total: usize) -> Option<Vec<Box<Shuffled>>> {
+fn shuffle_text(
+    lines: Vec<String>,
+    mut blocksize: usize,
+    min_blocksize: usize,
+    count: &mut usize,
+    total: usize,
+) -> Option<Vec<Box<Shuffled>>> {
     if blocksize == 1 || blocksize < min_blocksize {
         return None;
     }
@@ -26,7 +32,7 @@ fn shuffle_text(lines: Vec<String>, mut blocksize: usize, min_blocksize: usize, 
 
     let string_chunk_count: usize = string_chunks.clone().len();
     let permutations = string_chunks.into_iter().permutations(string_chunk_count);
-    
+
     for permutation in permutations {
         *count = *count + 1;
 
@@ -34,12 +40,15 @@ fn shuffle_text(lines: Vec<String>, mut blocksize: usize, min_blocksize: usize, 
         for mut chunk in &permutation {
             text.append(&mut chunk.clone());
         }
-        eprint!("generated permutation............................: {}/{}\r", count, total);
+        eprint!(
+            "generated permutation............................: {}/{}\r",
+            count, total
+        );
 
         combinations.push(Box::new(Shuffled {
             text: text.clone(),
             entropy: 999999.999999,
-            child_combinations: shuffle_text(text.clone(), blocksize, min_blocksize, count, total)
+            child_combinations: shuffle_text(text.clone(), blocksize, min_blocksize, count, total),
         }));
     }
 
@@ -48,11 +57,15 @@ fn shuffle_text(lines: Vec<String>, mut blocksize: usize, min_blocksize: usize, 
 
 /// Calculates an estimate of the total amount of combinations which would be generated
 /// with the linecount, starting blocksize and minimum blocksize.
-fn calculate_estimated_combination_count(line_count: usize, mut blocksize: usize, min_blocksize: usize) -> usize {
+fn calculate_estimated_combination_count(
+    line_count: usize,
+    mut blocksize: usize,
+    min_blocksize: usize,
+) -> usize {
     if blocksize == 1 || blocksize < min_blocksize {
         return 0;
     }
-    
+
     let precise_blocksize: f32 = blocksize as f32 / 2.0;
     blocksize = precise_blocksize.floor() as usize;
 
@@ -60,7 +73,8 @@ fn calculate_estimated_combination_count(line_count: usize, mut blocksize: usize
     let blockcount: usize = precise_blockcount.ceil() as usize;
 
     let mut counter: usize = (1..=blockcount).product();
-    counter + (calculate_estimated_combination_count(line_count, blocksize, min_blocksize) * counter)
+    counter
+        + (calculate_estimated_combination_count(line_count, blocksize, min_blocksize) * counter)
 }
 
 /// Counts the total amount of generated combination in a vector of boxed Shuffled structs.
@@ -96,15 +110,33 @@ If you clone an existing prost project, run `build_tools.sh` to clone and build 
 
     let minbs: usize = 2;
 
-    let estimated_combination_count: usize = calculate_estimated_combination_count(line_count, line_count, minbs);
-    eprintln!("estimated combination count......................: {}", estimated_combination_count);
+    let estimated_combination_count: usize =
+        calculate_estimated_combination_count(line_count, line_count, minbs);
+    eprintln!(
+        "estimated combination count......................: {}",
+        estimated_combination_count
+    );
 
-    let estimated_memory_usage: f32 = estimated_combination_count as f32 * (std::mem::size_of::<Shuffled>() as f32 + text.len() as f32);
-    eprintln!("estimated memory usage for all combinations (kiB): {}", estimated_memory_usage / 1024.0);
+    let estimated_memory_usage: f32 = estimated_combination_count as f32
+        * (std::mem::size_of::<Shuffled>() as f32 + text.len() as f32);
+    eprintln!(
+        "estimated memory usage for all combinations (kiB): {}",
+        estimated_memory_usage / 1024.0
+    );
 
     let mut count: usize = 0;
 
-    let shuffle_combinations = shuffle_text(lines, line_count, minbs, &mut count, estimated_combination_count).expect("should get some combinations");
+    let shuffle_combinations = shuffle_text(
+        lines,
+        line_count,
+        minbs,
+        &mut count,
+        estimated_combination_count,
+    )
+    .expect("should get some combinations");
     eprintln!("");
-    eprintln!("actual combinations to try.......................: {}", count_combinations(shuffle_combinations));
+    eprintln!(
+        "actual combinations to try.......................: {}",
+        count_combinations(shuffle_combinations)
+    );
 }
