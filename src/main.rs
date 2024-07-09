@@ -1,21 +1,22 @@
+use deepsize::DeepSizeOf;
 use itertools::Itertools;
 
-#[derive(Debug, Clone)]
-struct Shuffled {
-    text: Vec<usize>,
+#[derive(Debug, Clone, DeepSizeOf)]
+struct Permutation {
+    lines: Vec<usize>,
     entropy: f32,
-    child_combinations: Option<Vec<Shuffled>>,
+    child_permutations: Option<Vec<Permutation>>,
 }
 
 /// generate all possible permutations for the given lines. The count and total
 /// parameters are used to output a progress indicator.
-fn shuffle_text(
+fn shuffle_lines(
     lines: Vec<usize>,
     mut blocksize: usize,
     min_blocksize: usize,
     count: &mut usize,
     total: usize,
-) -> Option<Vec<Shuffled>> {
+) -> Option<Vec<Permutation>> {
     if blocksize == 1 || blocksize < min_blocksize {
         return None;
     }
@@ -23,7 +24,7 @@ fn shuffle_text(
     //blocksize = (blocksize as f32 / 2.0).ceil() as usize;
     blocksize /= 2;
 
-    let mut combinations: Vec<Shuffled> = Vec::new();
+    let mut line_permutations: Vec<Permutation> = Vec::new();
 
     let chunks = lines.into_iter().chunks(blocksize);
     let mut chunks_vec: Vec<Vec<usize>> = Vec::new();
@@ -37,23 +38,29 @@ fn shuffle_text(
     for permutation in permutations {
         *count = *count + 1;
 
-        let mut text: Vec<usize> = Vec::new();
+        let mut lines: Vec<usize> = Vec::new();
         for chunk in &permutation {
-            text.append(&mut chunk.clone());
+            lines.append(&mut chunk.clone());
         }
         eprint!(
             "generated permutation............................: {}/{}\r",
             count, total
         );
 
-        combinations.push(Shuffled {
-            text: text.clone(),
+        line_permutations.push(Permutation {
+            lines: lines.clone(),
             entropy: 999999.999999,
-            child_combinations: shuffle_text(text.clone(), blocksize, min_blocksize, count, total),
+            child_permutations: shuffle_lines(
+                lines.clone(),
+                blocksize,
+                min_blocksize,
+                count,
+                total,
+            ),
         });
     }
 
-    Some(combinations)
+    Some(line_permutations)
 }
 
 /// Makes sure that the given set of permutations is no longer than MAX_PARENT_PERMUTATIONS.
@@ -65,7 +72,7 @@ fn shuffle_text(
 /// -> [1, 2, 3, 4], [5, 6, 7, 8], [9, 10]
 /// -> [1 children: [2, 3, 4]], [5 children: [6, 7, 8]], [9 children: [10]]
 /// ```
-fn optimize_permutations(permutations: &mut Vec<Shuffled>, count: &mut usize) {
+fn optimize_permutations(permutations: &mut Vec<Permutation>, count: &mut usize) {
     // The value of this constant could also be used to determine a count of
     // jobs which simultaneously check all permutations.
     const MAX_PARENT_PERMUTATIONS: usize = 2;
@@ -78,27 +85,27 @@ fn optimize_permutations(permutations: &mut Vec<Shuffled>, count: &mut usize) {
 
     if permutations.len() > MAX_PARENT_PERMUTATIONS {
         let permutation_chunks = permutations.into_iter().chunks(MAX_PARENT_PERMUTATIONS);
-        let mut new_permutations: Vec<Shuffled> = Vec::new();
-        permutation_chunks.into_iter().for_each(|x| {
-            let mut x_vec = x.collect::<Vec<&mut Shuffled>>();
-            if x_vec.is_empty() {
+        let mut new_permutations: Vec<Permutation> = Vec::new();
+        permutation_chunks.into_iter().for_each(|iter_chunk| {
+            let mut chunk = iter_chunk.collect::<Vec<&mut Permutation>>();
+            if chunk.is_empty() {
                 return;
             }
 
-            if x_vec.len() == 1 {
-                new_permutations.push(x_vec[0].clone());
+            if chunk.len() == 1 {
+                new_permutations.push(chunk[0].clone());
                 return;
             }
 
-            let mut parent = x_vec[0].clone();
-            x_vec.remove(0);
+            let mut parent = chunk[0].clone();
+            chunk.remove(0);
 
-            if let None = parent.child_combinations {
-                parent.child_combinations = Some(Vec::new());
+            if let None = parent.child_permutations {
+                parent.child_permutations = Some(Vec::new());
             }
 
-            if let Some(children) = parent.child_combinations.as_mut() {
-                for child in x_vec {
+            if let Some(children) = parent.child_permutations.as_mut() {
+                for child in chunk {
                     children.push(child.clone());
                 }
             }
@@ -111,15 +118,15 @@ fn optimize_permutations(permutations: &mut Vec<Shuffled>, count: &mut usize) {
     }
 
     for permutation in permutations {
-        if let Some(child_permutations) = permutation.child_combinations.as_mut() {
+        if let Some(child_permutations) = permutation.child_permutations.as_mut() {
             optimize_permutations(child_permutations, count);
         }
     }
 }
 
-/// Calculates an estimate of the total amount of combinations which would be generated
+/// Calculates an estimate of the total amount of permutations which would be generated
 /// with the linecount, starting blocksize and minimum blocksize.
-fn calculate_estimated_combination_count(
+fn calculate_estimated_permutation_count(
     line_count: usize,
     mut blocksize: usize,
     min_blocksize: usize,
@@ -136,20 +143,20 @@ fn calculate_estimated_combination_count(
 
     let counter: usize = (1..=blockcount).product();
     counter
-        + (calculate_estimated_combination_count(line_count, blocksize, min_blocksize) * counter)
+        + (calculate_estimated_permutation_count(line_count, blocksize, min_blocksize) * counter)
 }
 
-/// Counts the total amount of generated combination in a vector of boxed Shuffled structs.
-fn count_combinations(combinations: &Vec<Shuffled>) -> usize {
-    if combinations.is_empty() || combinations[0].child_combinations.as_ref().is_none() {
+/// Counts the total amount of generated permutation in a vector of boxed Permutation structs.
+fn count_permutations(permutations: &Vec<Permutation>) -> usize {
+    if permutations.is_empty() || permutations[0].child_permutations.as_ref().is_none() {
         return 0;
     }
 
-    1 + count_combinations(&combinations[0].child_combinations.clone().unwrap())
+    1 + count_permutations(&permutations[0].child_permutations.clone().unwrap())
 }
 
 fn main() {
-    let text = "float i_event0 = 0;           // fade in
+    let lines = "float i_event0 = 0;           // fade in
 float i_event5 = 2 * spsec;   // end of fade in
 float i_event28 = 22 * spsec;     // sixth scene (chains far away)
 float i_event28 = 22 * spsec;     // sixth scene (chains far away)
@@ -162,38 +169,41 @@ float i_event80 = 36 * spsec; // second dreamy bright scene"
     // Minimal block size
     let minbs: usize = 1;
 
-    let lines = text.split("\n").collect::<Vec<&str>>();
+    let lines = lines.split("\n").collect::<Vec<&str>>();
     let line_count: usize = lines.clone().len();
 
-    let estimated_combination_count: usize =
-        calculate_estimated_combination_count(line_count, line_count, minbs);
+    let estimated_permutation_count: usize =
+        calculate_estimated_permutation_count(line_count, line_count, minbs);
     eprintln!(
-        "estimated combination count......................: {}",
-        estimated_combination_count
+        "estimated permutation count......................: {}",
+        estimated_permutation_count
     );
 
-    let estimated_memory_usage: f32 = estimated_combination_count as f32
-        * (std::mem::size_of::<Shuffled>() as f32
-            + (line_count as f32 * std::mem::size_of::<usize>() as f32));
+    // The estimate is doubled since the optimisation step likely doubles the memory
+    // usage in favour of more efficient searching
+    let estimated_memory_usage: f32 = estimated_permutation_count as f32
+        * (std::mem::size_of::<Permutation>() as f32
+            + (line_count as f32 * std::mem::size_of::<usize>() as f32))
+        * 2.0;
     eprintln!(
-        "estimated memory usage for all combinations (GiB): {}",
+        "estimated memory usage for all permutations (GiB): {}",
         estimated_memory_usage / (1024.0_f32.powf(3.0))
     );
 
     let mut count: usize = 0;
 
-    let mut permutations = shuffle_text(
+    let mut permutations = shuffle_lines(
         (0..line_count).collect(),
         line_count,
         minbs,
         &mut count,
-        estimated_combination_count,
+        estimated_permutation_count,
     )
-    .expect("should get some combinations");
+    .expect("should get some permutations");
 
     eprintln!("");
     eprintln!(
-        "actual combinations to try.......................: {}",
+        "actual permutations to try.......................: {}",
         count
     );
 
@@ -202,8 +212,13 @@ float i_event80 = 36 * spsec; // second dreamy bright scene"
     eprintln!("");
 
     eprintln!(
+        "\"actual\" memory usage for all permutations (GiB).: {}",
+        permutations.deep_size_of() as f32 / (1024.0_f32.powf(3.0))
+    );
+
+    eprintln!(
         "block depth......................................: {}",
-        count_combinations(&permutations)
+        count_permutations(&permutations)
     );
 
     // When checking which permutation is the best, the current set of permutations
