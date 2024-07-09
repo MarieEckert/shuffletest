@@ -65,12 +65,56 @@ fn shuffle_text(
 /// -> [1, 2, 3, 4], [5, 6, 7, 8], [9, 10]
 /// -> [1 children: [2, 3, 4]], [5 children: [6, 7, 8]], [9 children: [10]]
 /// ```
-fn optimize_permutations(permutations: Vec<Shuffled>) -> Vec<Shuffled> {
+fn optimize_permutations(permutations: &mut Vec<Shuffled>, count: &mut usize) {
     // The value of this constant could also be used to determine a count of
     // jobs which simultaneously check all permutations.
-    const MAX_PARENT_PERMUTATIONS: usize = 4;
+    const MAX_PARENT_PERMUTATIONS: usize = 2;
 
-    permutations
+    *count += 1;
+    eprint!(
+        "optimizing permutation set.......................: {}\r",
+        count
+    );
+
+    if permutations.len() > MAX_PARENT_PERMUTATIONS {
+        let permutation_chunks = permutations.into_iter().chunks(MAX_PARENT_PERMUTATIONS);
+        let mut new_permutations: Vec<Shuffled> = Vec::new();
+        permutation_chunks.into_iter().for_each(|x| {
+            let mut x_vec = x.collect::<Vec<&mut Shuffled>>();
+            if x_vec.is_empty() {
+                return;
+            }
+
+            if x_vec.len() == 1 {
+                new_permutations.push(x_vec[0].clone());
+                return;
+            }
+
+            let mut parent = x_vec[0].clone();
+            x_vec.remove(0);
+
+            if let None = parent.child_combinations {
+                parent.child_combinations = Some(Vec::new());
+            }
+
+            if let Some(children) = parent.child_combinations.as_mut() {
+                for child in x_vec {
+                    children.push(child.clone());
+                }
+            }
+
+            new_permutations.push(parent);
+        });
+
+        permutations.clear();
+        permutations.append(&mut new_permutations);
+    }
+
+    for permutation in permutations {
+        if let Some(child_permutations) = permutation.child_combinations.as_mut() {
+            optimize_permutations(child_permutations, count);
+        }
+    }
 }
 
 /// Calculates an estimate of the total amount of combinations which would be generated
@@ -107,8 +151,10 @@ fn count_combinations(combinations: &Vec<Shuffled>) -> usize {
 fn main() {
     let text = "float i_event0 = 0;           // fade in
 float i_event5 = 2 * spsec;   // end of fade in
-float i_event27p5 = 20 * spsec;   // ship from other side
 float i_event28 = 22 * spsec;     // sixth scene (chains far away)
+float i_event28 = 22 * spsec;     // sixth scene (chains far away)
+float i_event28 = 22 * spsec;     // sixth scene (chains far away)
+float i_event27p5 = 20 * spsec;   // ship from other side
 float i_event30 = 24 * spsec;     // start of first ship scene
 float i_event80 = 36 * spsec; // second dreamy bright scene"
         .to_string();
@@ -136,21 +182,25 @@ float i_event80 = 36 * spsec; // second dreamy bright scene"
 
     let mut count: usize = 0;
 
-    let permutations = optimize_permutations(
-        shuffle_text(
-            (0..line_count).collect(),
-            line_count,
-            minbs,
-            &mut count,
-            estimated_combination_count,
-        )
-        .expect("should get some combinations"),
-    );
+    let mut permutations = shuffle_text(
+        (0..line_count).collect(),
+        line_count,
+        minbs,
+        &mut count,
+        estimated_combination_count,
+    )
+    .expect("should get some combinations");
+
     eprintln!("");
     eprintln!(
         "actual combinations to try.......................: {}",
         count
     );
+
+    count = 0;
+    optimize_permutations(&mut permutations, &mut count);
+    eprintln!("");
+
     eprintln!(
         "block depth......................................: {}",
         count_combinations(&permutations)
