@@ -20,7 +20,8 @@ fn shuffle_text(
         return None;
     }
 
-    blocksize = (blocksize as f32 / 2.0).ceil() as usize;
+    //blocksize = (blocksize as f32 / 2.0).ceil() as usize;
+    blocksize /= 2;
 
     let mut combinations: Vec<Shuffled> = Vec::new();
 
@@ -64,7 +65,7 @@ fn shuffle_text(
 /// -> [1, 2, 3, 4], [5, 6, 7, 8], [9, 10]
 /// -> [1 children: [2, 3, 4]], [5 children: [6, 7, 8]], [9 children: [10]]
 /// ```
-fn optimize_permutations(mut permutations: Vec<Shuffled>) -> Vec<Shuffled> {
+fn optimize_permutations(permutations: Vec<Shuffled>) -> Vec<Shuffled> {
     // The value of this constant could also be used to determine a count of
     // jobs which simultaneously check all permutations.
     const MAX_PARENT_PERMUTATIONS: usize = 4;
@@ -154,7 +155,6 @@ float i_event80 = 36 * spsec; // second dreamy bright scene"
         "block depth......................................: {}",
         count_combinations(&permutations)
     );
-    println!("{:#?}", permutations);
 
     // When checking which permutation is the best, the current set of permutations
     // should be checked completely. The children of the smallest permutation in the
