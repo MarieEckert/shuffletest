@@ -1,10 +1,18 @@
+//! Test implementation of permutating and optimising permutation
+//! for prost-shuffle.
+
 use deepsize::DeepSizeOf;
 use itertools::Itertools;
 
 #[derive(Debug, Clone, DeepSizeOf)]
 struct Permutation {
+    /// Relative line number of the block of text the permutation is applied to
     lines: Vec<usize>,
+
+    /// The entropy of the final generated executable with this permutation
     entropy: f32,
+
+    /// The permutations derived from this permutation and "adopted" permutations
     child_permutations: Option<Vec<Permutation>>,
 }
 
