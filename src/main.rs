@@ -2,13 +2,15 @@ use itertools::Itertools;
 
 #[derive(Debug)]
 struct Shuffled {
-    text: Vec<String>,
+    text: Vec<usize>,
     entropy: f32,
     child_combinations: Option<Vec<Shuffled>>,
 }
 
+/// generate all possible permutations for the given lines. The count and total
+/// parameters are used to output a progress indicator.
 fn shuffle_text(
-    lines: Vec<String>,
+    lines: Vec<usize>,
     mut blocksize: usize,
     min_blocksize: usize,
     count: &mut usize,
@@ -23,18 +25,18 @@ fn shuffle_text(
     let mut combinations: Vec<Shuffled> = Vec::new();
 
     let chunks = lines.into_iter().chunks(blocksize);
-    let mut string_chunks: Vec<Vec<String>> = Vec::new();
-    for chunk in &chunks {
-        string_chunks.push(chunk.collect::<Vec<String>>());
-    }
+    let mut chunks_vec: Vec<Vec<usize>> = Vec::new();
+    chunks
+        .into_iter()
+        .for_each(|x| chunks_vec.push(x.collect::<Vec<usize>>()));
+    let chunks_count = chunks_vec.len();
 
-    let string_chunk_count: usize = string_chunks.clone().len();
-    let permutations = string_chunks.into_iter().permutations(string_chunk_count);
+    let permutations = chunks_vec.into_iter().permutations(chunks_count);
 
     for permutation in permutations {
         *count = *count + 1;
 
-        let mut text: Vec<String> = Vec::new();
+        let mut text: Vec<usize> = Vec::new();
         for chunk in &permutation {
             text.append(&mut chunk.clone());
         }
@@ -89,28 +91,22 @@ fn count_combinations(combinations: Vec<Shuffled>) -> usize {
 }
 
 fn main() {
-    let text = "# Prost
+    let text = "  float c = hash1(n + 317);
+  float e = hash1(n + 157);
+  float g = hash1(n + 474);
+  float f = hash1(n + 268);
+  float d = hash1(n + 428);
+  float a = hash1(n);
+  float h = hash1(n + 585);
+  float b = hash1(n + 111);
+"
+    .to_string();
 
+    // Minimal block size
+    let minbs: usize = 4;
 
-Prost is a 4k intro framework: it uses handlebar templating and provides example democode
-Prost is a 4k intro framework: it uses handlebar templating and provides example democode
-Prost is a 4k intro framework: it uses handlebar templating and provides example democode
-Prost is a 4k intro framework: it uses handlebar templating and provides example democode
-Prost is a 4k intro framework: it uses handlebar templating and provides example democode
-
-## Usage
-
-If you clone an existing prost project, run `build_tools.sh` to clone and build the tools (prost, clinkshter, cold).".to_string();
-
-    let str_lines = text.split("\n").collect::<Vec<&str>>();
-    let mut lines: Vec<String> = Vec::new();
-    for line in str_lines {
-        lines.push(line.to_string());
-    }
-
+    let lines = text.split("\n").collect::<Vec<&str>>();
     let line_count: usize = lines.clone().len();
-
-    let minbs: usize = 1;
 
     let estimated_combination_count: usize =
         calculate_estimated_combination_count(line_count, line_count, minbs);
@@ -120,16 +116,17 @@ If you clone an existing prost project, run `build_tools.sh` to clone and build 
     );
 
     let estimated_memory_usage: f32 = estimated_combination_count as f32
-        * (std::mem::size_of::<Shuffled>() as f32 + text.len() as f32);
+        * (std::mem::size_of::<Shuffled>() as f32
+            + (line_count as f32 * std::mem::size_of::<usize>() as f32));
     eprintln!(
-        "estimated memory usage for all combinations (kiB): {}",
-        estimated_memory_usage / 1024.0
+        "estimated memory usage for all combinations (GiB): {}",
+        estimated_memory_usage / (1024.0_f32.powf(3.0))
     );
 
     let mut count: usize = 0;
 
-    let shuffle_combinations = shuffle_text(
-        lines,
+    let _ = shuffle_text(
+        (0..line_count).collect(),
         line_count,
         minbs,
         &mut count,
@@ -139,6 +136,6 @@ If you clone an existing prost project, run `build_tools.sh` to clone and build 
     eprintln!("");
     eprintln!(
         "actual combinations to try.......................: {}",
-        count_combinations(shuffle_combinations)
+        count
     );
 }
