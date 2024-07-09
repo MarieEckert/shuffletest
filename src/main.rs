@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Shuffled {
     text: Vec<usize>,
     entropy: f32,
@@ -20,7 +20,7 @@ fn shuffle_text(
         return None;
     }
 
-    blocksize = blocksize / 2;
+    blocksize = (blocksize as f32 / 2.0).ceil() as usize;
 
     let mut combinations: Vec<Shuffled> = Vec::new();
 
@@ -55,6 +55,23 @@ fn shuffle_text(
     Some(combinations)
 }
 
+/// Makes sure that the given set of permutations is no longer than MAX_PARENT_PERMUTATIONS.
+/// if the permutation count exceeds MAX_PARENT_PERMUTATIONS, split the
+/// permutations into equal parts and set all permutations after the first
+/// one of a part to be a child of the first. e.g:
+/// ```
+///    1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+/// -> [1, 2, 3, 4], [5, 6, 7, 8], [9, 10]
+/// -> [1 children: [2, 3, 4]], [5 children: [6, 7, 8]], [9 children: [10]]
+/// ```
+fn optimize_permutations(mut permutations: Vec<Shuffled>) -> Vec<Shuffled> {
+    // The value of this constant could also be used to determine a count of
+    // jobs which simultaneously check all permutations.
+    const MAX_PARENT_PERMUTATIONS: usize = 4;
+
+    permutations
+}
+
 /// Calculates an estimate of the total amount of combinations which would be generated
 /// with the linecount, starting blocksize and minimum blocksize.
 fn calculate_estimated_combination_count(
@@ -78,32 +95,25 @@ fn calculate_estimated_combination_count(
 }
 
 /// Counts the total amount of generated combination in a vector of boxed Shuffled structs.
-fn count_combinations(combinations: Vec<Shuffled>) -> usize {
-    let mut count = combinations.len();
-
-    for combination in combinations {
-        if let Some(children) = combination.child_combinations {
-            count = count + count_combinations(children);
-        }
+fn count_combinations(combinations: &Vec<Shuffled>) -> usize {
+    if combinations.is_empty() || combinations[0].child_combinations.as_ref().is_none() {
+        return 0;
     }
 
-    count
+    1 + count_combinations(&combinations[0].child_combinations.clone().unwrap())
 }
 
 fn main() {
-    let text = "  float c = hash1(n + 317);
-  float e = hash1(n + 157);
-  float g = hash1(n + 474);
-  float f = hash1(n + 268);
-  float d = hash1(n + 428);
-  float a = hash1(n);
-  float h = hash1(n + 585);
-  float b = hash1(n + 111);
-"
-    .to_string();
+    let text = "float i_event0 = 0;           // fade in
+float i_event5 = 2 * spsec;   // end of fade in
+float i_event27p5 = 20 * spsec;   // ship from other side
+float i_event28 = 22 * spsec;     // sixth scene (chains far away)
+float i_event30 = 24 * spsec;     // start of first ship scene
+float i_event80 = 36 * spsec; // second dreamy bright scene"
+        .to_string();
 
     // Minimal block size
-    let minbs: usize = 4;
+    let minbs: usize = 1;
 
     let lines = text.split("\n").collect::<Vec<&str>>();
     let line_count: usize = lines.clone().len();
@@ -125,17 +135,31 @@ fn main() {
 
     let mut count: usize = 0;
 
-    let _ = shuffle_text(
-        (0..line_count).collect(),
-        line_count,
-        minbs,
-        &mut count,
-        estimated_combination_count,
-    )
-    .expect("should get some combinations");
+    let permutations = optimize_permutations(
+        shuffle_text(
+            (0..line_count).collect(),
+            line_count,
+            minbs,
+            &mut count,
+            estimated_combination_count,
+        )
+        .expect("should get some combinations"),
+    );
     eprintln!("");
     eprintln!(
         "actual combinations to try.......................: {}",
         count
     );
+    eprintln!(
+        "block depth......................................: {}",
+        count_combinations(&permutations)
+    );
+    println!("{:#?}", permutations);
+
+    // When checking which permutation is the best, the current set of permutations
+    // should be checked completely. The children of the smallest permutation in the
+    // current set should then become the new set to check.
+    // Idea #1: A permutation-history should be kept and before actually checking a
+    // permutation, it should be made sure that this permutation is not a duplicate
+    // of a previously checked permutation.
 }
