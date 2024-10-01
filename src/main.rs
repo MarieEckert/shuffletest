@@ -91,7 +91,7 @@ fn optimize_permutations(permutations: &mut Vec<Permutation>, count: &mut usize)
         count
     );
 
-    if permutations.len() > MAX_PARENT_PERMUTATIONS {
+    while permutations.len() > MAX_PARENT_PERMUTATIONS {
         let permutation_chunks = permutations.into_iter().chunks(MAX_PARENT_PERMUTATIONS);
         let mut new_permutations: Vec<Permutation> = Vec::new();
         permutation_chunks.into_iter().for_each(|iter_chunk| {
@@ -160,7 +160,15 @@ fn count_permutations(permutations: &Vec<Permutation>) -> usize {
         return 0;
     }
 
-    1 + count_permutations(&permutations[0].child_permutations.clone().unwrap())
+    let mut prev: usize = 0;
+    for permutation in permutations {
+        let cur = count_permutations(permutation.child_permutations.as_ref().unwrap());
+        if cur > prev {
+            prev = cur;
+        }
+    }
+
+    1 + prev
 }
 
 fn main() {
